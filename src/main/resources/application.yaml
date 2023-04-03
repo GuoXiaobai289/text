@@ -3,8 +3,6 @@ spring:
     url: jdbc:mysql://127.0.0.1:3306/test-system?serverTimezone=GMT%2b8
     username: qian
     password: 123456
-service:
-  port: 80
 
   thymeleaf:
     cache: false
@@ -32,3 +30,5 @@ kaptcha:
     to: white
   border:
     enabled: false
+server:
+  port: 80
