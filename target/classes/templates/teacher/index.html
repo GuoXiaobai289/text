@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:shiro="http://www.pollix.at/thymeleaf/shiro">
+<head th:replace="teacher/teacher-common::commonCss(~{::title},~{},~{::script},~{::style})">
+    <title>主页</title>
+    <script th:src="@{/echarts/echarts.min.js}"></script>
+    <style type="text/css">
+        .body{
+            background-color: #f8f8f8;
+        }
+        .shortcut i{
+            display: inline-block;
+            width: 100%;
+            height: 100px;
+            line-height: 100px;
+            text-align: center;
+            border-radius: 2px;
+            font-size: 40px;
+            background-color: #F8F8F8;
+            color: #333;
+
+        }
+        .shortcut cite{
+            position: relative;
+            top: 5px;
+            display: block;
+            color: #666;
+            text-overflow: ellipsis;
+            overflow: hidden;
+            white-space: nowrap;
+            font-size: 18px;
+        }
+        .shortcut a{
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        .data{
+            max-width: 100%;
+            height: 87px;
+            border-radius: 2px;
+            background-color: #F8F8F8;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-around;
+            padding: 20px;
+        }
+    </style>
+</head>
+<body>
+<div class="layui-layout layui-layout-admin">
+
+    <div th:replace="teacher/teacher-common::header"></div>
+    <div th:replace="teacher/teacher-common::side('index')"></div>
+
+    <div class="layui-body body">
+        <div class="layui-fluid" style="padding: 15px;">
+            <div class="layui-row layui-col-space2">
+                <div class="layui-col-md12" style="margin-bottom: 20px;">
+                    <div class="layui-card">
+                        <div class="layui-card-body">
+                            <table class="layui-hide" id="examTable" lay-skin="line" lay-filter="examTable">
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <div th:replace="teacher/teacher-common::footer"></div>
+</div>
+<script th:inline="javascript">
+    var myAvgGradeChart;
+    var myStateGradeChart;
+    layui.use(['carousel','table'], function(){
+        var table = layui.table;
+        var carousel = layui.carousel;
+        //建造实例
+        carousel.render({
+            elem: '#chart'
+            ,width: '100%'
+            ,height: '400px'
+            ,arrow: 'none'
+            ,autoplay: false
+            ,indicator: 'inside'
+            ,trigger : 'mouseover'
+        });
+
+       // initAvgGradeChart();
+       // initStateGradeChart();
+
+        carousel.on('change(chart)', function(obj){
+            console.log(obj.index); //当前条目的索引
+            myAvgGradeChart.resize();
+            myStateGradeChart.resize();
+        });
+
+        var tableIns = table.render({
+            elem: '#examTable'
+            , url: '/exam/listAnalysisForPage'
+            , contentType: 'application/json'
+            , method: 'post'
+            , defaultToolbar: []
+            , page: true
+            , limits: [5, 10, 20]
+            , limit: 10
+            , cols: [
+                [
+                    {field: 'title', title: '考试', rowspan:2, width: 100}
+                    , {field: 'paperTitle', title: '试卷', rowspan:2, width: 100}
+                    , {field: 'clazzList', title: '考试班级', rowspan:2, width: 175, templet: function (d) {
+                        var clazzList = d.clazzList;
+                        var select = "";
+                        $.each(clazzList,function (index,clazz) {
+                            select += "["+clazz.name+"] ";
+                        })
+                        select += "</select>";
+                        return select
+                    }}
+                    , {title: '成绩分析', colspan:4, align:'center'}
+                    , {title: '考生分析', colspan:3, align:'center'}
+                    , {field: 'startTime', title: '开始时间', rowspan:2, width: 175}
+                    , {field: 'endTime', title: '结束时间', rowspan:2, width: 175}
+                ],
+                [
+                    {field: 'max', title: '最高分', width: 75}
+                    , {field: 'min', title: '最低分', width: 75}
+                    , {field: 'avg', title: '平均分', width: 75}
+                    , {field: 'total', title: '总分', width: 75}
+                    , {field: 'pass', title: '及格数', width: 75}
+                    , {field: 'attend', title: '参加数', width: 75}
+                    , {field: 'absent', title: '缺考数', width: 75}
+                ]
+            ]
+            ,parseData: function(res){ //将原始数据解析成 table 组件所规定的数据
+                return {
+                    "code": res.result.code, //解析接口状态
+                    "msg": res.message, //解析提示文本
+                    "count": res.data.total, //解析数据长度
+                    "data": res.data.records //解析数据列表
+                };
+            }
+        });
+    });
+    function initAvgGradeChart() {
+        $.ajax({
+            url: '/chart/teacherAvgGradeChart',
+            type: 'get',
+            dataType: 'json',
+            success:function (data){
+                var examChart = document.getElementById('avgGradeChart');
+                myAvgGradeChart = echarts.init(examChart);
+                var gradeOption;
+                gradeOption = {
+                    title: {
+                        text: '近7场考试平均成绩折线图',
+                        left: 'center'
+                    },
+                    tooltip:{
+                        trigger: 'axis'
+                    },
+                    xAxis: {
+                        type: 'category',
+                        data: data.data.examList
+                    },
+                    yAxis: {
+                        type: 'value'
+                    },
+                    series: [
+                        {
+                            name:'分数',
+                            data: data.data.scoreList,
+                            type: 'line',
+                            symbolSize:8,
+                            itemStyle:{
+                                normal:{
+                                    label : {
+                                        show: true
+                                    }
+                                }
+                            }
+
+                        }
+                    ]
+                };
+                myAvgGradeChart.setOption(gradeOption);
+            }
+        });
+    }
+    function initStateGradeChart() {
+        $.ajax({
+            url: '/chart/teacherStateGradeChart',
+            type: 'get',
+            dataType: 'json',
+            success:function (data){
+                var examChart = document.getElementById('stateGradeChart');
+                myStateGradeChart = echarts.init(examChart);
+                var gradeOption;
+                gradeOption = {
+                    title: {
+                        text: '近7场考试成绩分布阶段图',
+                        left: 'center'
+                    },
+                    color: [
+                        '#ee6666', '#fac858', '#5470c6', '#91cc75'
+                    ],
+                    tooltip: {
+                        trigger: 'axis',
+                        axisPointer: {
+                            // Use axis to trigger tooltip
+                            type: 'shadow' // 'shadow' as default; can also be 'line' or 'shadow'
+                        }
+                    },
+                    xAxis: {
+                        type: 'value'
+                    },
+                    yAxis: {
+                        type: 'category',
+                        data: data.data.examList
+                    },
+                    series: [
+                        {
+                            name: '不及格',
+                            type: 'bar',
+                            stack: 'total',
+                            label: {
+                                show: true
+                            },
+                            emphasis: {
+                                focus: 'series'
+                            },
+                            data: data.data.scoreStateMap.unPass
+                        },
+                        {
+                            name: '及格',
+                            type: 'bar',
+                            stack: 'total',
+                            label: {
+                                show: true
+                            },
+                            emphasis: {
+                                focus: 'series'
+                            },
+                            data: data.data.scoreStateMap.pass
+                        },
+                        {
+                            name: '良好',
+                            type: 'bar',
+                            stack: 'total',
+                            label: {
+                                show: true
+                            },
+                            emphasis: {
+                                focus: 'series'
+                            },
+                            data: data.data.scoreStateMap.good
+                        },
+                        {
+                            name: '优秀',
+                            type: 'bar',
+                            stack: 'total',
+                            label: {
+                                show: true
+                            },
+                            emphasis: {
+                                focus: 'series'
+                            },
+                            data: data.data.scoreStateMap.excellent
+                        }
+                    ]
+                };
+                myStateGradeChart.setOption(gradeOption);
+            }
+        });
+    }
+
+</script>
+</body>
+</html>

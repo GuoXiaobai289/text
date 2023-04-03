@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:shiro="http://www.pollix.at/thymeleaf/shiro">
+<head th:fragment="commonCss(title,links,script,style)">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <title th:replace="${title}">Title</title>
+
+  <link rel="stylesheet" th:href="@{/layui/css/layui.css}">
+  <link rel="stylesheet" th:href="@{/layui/css/modules/layer/default/layer.css}">
+  <script th:src="@{/layui/layui.js}"></script>
+  <script th:src="@{/jquery-3.5.1.min.js}"></script>
+  <script th:src="@{/layer/layer.js}"></script>
+
+  <th:block th:replace="${script}"/>
+  <th:block th:replace="${links}"/>
+  <th:block th:replace="${style}"/>
+</head>
+<body>
+<div th:fragment="header" class="layui-header">
+  <div class="layui-logo" style="font-weight: bold;color: white;font-size:large;">课程在线考试系统</div>
+  <!-- 头部区域（可配合layui 已有的水平导航） -->
+  <ul class="layui-nav layui-layout-right">
+    <li class="layui-nav-item"><a th:href="@{/}">返回首页</a></li>
+    <li class="layui-nav-item layui-hide layui-show-md-inline-block">
+      <a href="javascript:;">
+        <img th:src="@{http://rb5o4pf4r.hn-bkt.clouddn.com/{img}(img=${userInfo.img})}"
+             class="layui-nav-img">
+        <span shiro:principal property="name"></span>
+      </a>
+      <dl class="layui-nav-child">
+        <dd><a th:href="@{/setting/information}">个人资料</a></dd>
+        <dd><a th:href="@{/logout}">退出登录</a></dd>
+      </dl>
+    </li>
+  </ul>
+</div>
+
+<div th:fragment="side(thispage)" class="layui-side layui-bg-black">
+  <div class="layui-side-scroll" >
+    <ul class="layui-nav layui-nav-tree layui-bg-cyan layui-inline" lay-filter="test">
+      <li th:class="${thispage=='index'?'layui-nav-item layui-this':'layui-nav-item'}"><a th:href="@{/admin/index}">主页</a></li>
+      <li class="layui-nav-item  layui-nav-itemed">
+        <a class="" href="javascript:;">用户管理</a>
+        <dl class="layui-nav-child">
+          <dd th:class="${thispage=='user'?'layui-nav-item layui-this':'layui-nav-item'}"><a th:href="@{/admin/user/user}">用户管理</a></dd>
+          <dd th:class="${thispage=='clazz'?'layui-nav-item layui-this':'layui-nav-item'}"><a th:href="@{/admin/user/clazz}">班级管理</a></dd>
+          <dd th:class="${thispage=='apply'?'layui-nav-item layui-this':'layui-nav-item'}"><a th:href="@{/admin/user/apply}">申请列表</a></dd>
+        </dl>
+      </li>
+      <li class="layui-nav-item  layui-nav-itemed">
+        <a class="" href="javascript:;">题目管理</a>
+        <dl class="layui-nav-child">
+          <dd th:class="${thispage=='question'?'layui-nav-item layui-this':'layui-nav-item'}"><a th:href="@{/admin/question/question}">题目管理</a></dd>
+          <dd th:class="${thispage=='repo'?'layui-nav-item layui-this':'layui-nav-item'}"><a th:href="@{/admin/question/repo}">题库管理</a></dd>
+        </dl>
+      </li>
+      <li class="layui-nav-item  layui-nav-itemed">
+        <a class="" href="javascript:;">考试管理</a>
+        <dl class="layui-nav-child">
+          <dd th:class="${thispage=='exam'?'layui-nav-item layui-this':'layui-nav-item'}"><a th:href="@{/admin/exam/exam}">考试管理</a></dd>
+          <dd th:class="${thispage=='paper'?'layui-nav-item layui-this':'layui-nav-item'}"><a th:href="@{/admin/exam/paper}">试卷管理</a></dd>
+          <dd th:class="${thispage=='grade'?'layui-nav-item layui-this':'layui-nav-item'}"><a th:href="@{/admin/exam/grade}">成绩列表</a></dd>
+        </dl>
+      </li>
+      <shiro:hasRole name="superadmin">
+        <li th:class="${thispage=='admin'?'layui-nav-item layui-this':'layui-nav-item'}"><a th:href="@{/admin/admin}">管理员管理</a></li>
+        <li th:class="${thispage=='notice'?'layui-nav-item layui-this':'layui-nav-item'}"><a th:href="@{/admin/notice}">公告管理</a></li>
+        <li th:class="${thispage=='operation'?'layui-nav-item layui-this':'layui-nav-item'}"><a th:href="@{/admin/operation}">操作日志</a></li>
+      </shiro:hasRole>
+    </ul>
+  </div>
+</div>
+
+<div th:fragment="footer" class="layui-footer" style="text-align: center">
+  <!-- 底部固定区域 -->
+  <div class="layui-col-md12" style="color: #7e7e7e;font-size: 10px">课程在线考试系统 @GDPU - Iurac</div>
+</div>
+</body>
+</html>

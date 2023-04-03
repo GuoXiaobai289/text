@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:shiro="http://www.pollix.at/thymeleaf/shiro">
+<head th:replace="front-common :: commonCss(~{::title},~{},~{},~{::style})">
+    <title>JAVA课程在线考试</title>
+    <style type="text/css">
+        * {
+            padding: 0px;
+            margin: 0px;
+        }
+    </style>
+</head>
+<body>
+<div class="layui-layout layui-layout-admin">
+
+    <div th:replace="front-common::header('index')"></div>
+
+    <div class="layui-layout-body" style="margin-top: 50px;">
+        <!-- 内容主体区域 -->
+        <div class="layui-bg-gray" style="padding: 30px;">
+            <div class="layui-container">
+                <div class="layui-row layui-col-space15">
+                    <div class="layui-col-md8" style="margin-left: 180px;">
+                        <div class="layui-carousel" id="carousel">
+                            <div carousel-item="">
+                                <div><img
+                                        src="https://www.qmbk.com/jingyan/UploadFiles_2374/20210417/2021041716262490.jpg">
+                                </div>
+                                <div><img
+                                        src="https://p5.itc.cn/images01/20201023/854be4011696459bb6377030cbeadd9c.jpeg">
+                                </div>
+                                <div><img src="https://p3.ssl.qhimgs3.com/t017bd8d26728c851fa.jpg"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <!--                    <div class="layui-col-md4">-->
+                    <!--                        <div class="layui-card">-->
+                    <!--                            <div class="layui-card-header"><i class="fa fa-bullhorn icon icon-tip"></i>系统公告</div>-->
+                    <!--&lt;!&ndash;                            <div class="layui-card-body layui-text">&ndash;&gt;-->
+                    <!--&lt;!&ndash;                                <h3 style="text-align: center" id="notice_title"></h3>&ndash;&gt;-->
+                    <!--&lt;!&ndash;                                <pre style="font-size: 14px;font-family: Helvetica, arial, sans-serif" id="notice_content">&ndash;&gt;-->
+                    <!--&lt;!&ndash;                                    </pre>&ndash;&gt;-->
+                    <!--&lt;!&ndash;                                <div class="layui-font-gray" style="text-align: right" id="notice_create_time"></div>&ndash;&gt;-->
+                    <!--&lt;!&ndash;                            </div>&ndash;&gt;-->
+                    <!--                        </div>-->
+                    <!--                    </div>-->
+                </div>
+            </div>
+        </div>
+        <div th:replace="front-common::footer"></div>
+    </div>
+
+</div>
+<script>
+
+    layui.use(['carousel', 'form'], function () {
+        var carousel = layui.carousel;
+        //图片轮播
+        carousel.render({
+            elem: '#carousel'
+            , width: '100%'
+            , height: '400'
+            , interval: 5000
+            , indicator: "inside"
+        });
+
+        showNotice();
+    });
+
+    // function showNotice() {
+    //     $.ajax({
+    //         url: '/sys/notice/getLatest',
+    //         type: 'get',
+    //         dataType: 'json',
+    //         success: function (data) {
+    //             if (data.result.status) {
+    //                 $("#notice_title").html(data.data.title);
+    //                 $("#notice_content").html(data.data.content);
+    //                 $("#notice_create_time").html(data.data.updateTime);
+    //             } else {
+    //                 $("#notice_content").html(data.result.msg);
+    //             }
+    //         },
+    //         error: function (data) {
+    //             $("#notice_content").html(data.responseJSON.result.msg);
+    //         }
+    //     });
+    // }
+
+
+</script>
+</body>
+
+</html>
