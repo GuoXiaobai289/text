@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:shiro="http://www.pollix.at/thymeleaf/shiro">
+<head th:replace="front-common::commonCss(~{::title},~{},~{::script},~{::style})">
+    <title>JAVA在线考试</title>
+    <style type="text/css">
+        .container{
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            border: #f8f8f8 30px solid;
+            padding: 0;
+        }
+        .content{
+            background-color: #ffffff;
+            float: right;
+            min-height: 75vh;
+            width: 100%;
+        }
+        .layui-disabled, .layui-disabled:hover {
+            color: #000000!important;
+            cursor: not-allowed!important;
+        }
+        .layui-radio-disbaled * {
+            color: #000000!important;
+        }.layui-checkbox-disbaled em {
+                     color: #000000!important;
+         }
+    </style>
+
+    <script type="text/html" id="bar">
+        <a class="layui-btn layui-btn-xs" lay-event="detail">查看</a>
+    </script>
+    <script th:inline="javascript">
+        layui.use(['table','element','laydate'], function(){
+            var table = layui.table;
+            var element = layui.element;
+            var laydate = layui.laydate;
+
+            laydate.render({
+                elem: '#search-createTime'
+                ,range: true
+            });
+
+            var tableIns = table.render({
+                elem: '#QuestionTable'
+                , url: '/question/listWrongQuestion'
+                , contentType: 'application/json'
+                , method: 'post'
+                , where: {
+                    "msg":"",
+                    "code":"",
+                    "data": {
+                        "content": $('#search-content').val(),
+                        "startDate": $("#search-createTime").val().split(" - ")[0],
+                        "endTime": $("#search-createTime").val().split(" - ")[1]!=null?$("#search-createTime").val().split(" - ")[1]:"",
+                        "type": $('#search-type').val()
+                    }
+                }
+                , defaultToolbar: []
+                , page: true
+                , limits: [5, 10, 20]
+                , limit: 10
+                , cols: [
+                    [
+                        {type: 'checkbox', fixed: 'left'}
+                        , {field: 'id', title: 'ID', hide: true}
+                        , {field: 'content', title: '题目'}
+                        , {field: 'type', title: '类型', templet: function (d) {
+                            var type = d.type * 1;
+                            var typeName = '其它';
+                            if (type === 1) {
+                                typeName = '单选题';
+                            } else if (type === 2) {
+                                typeName = '多选题';
+                            } else if (type === 3) {
+                                typeName = '判断题';
+                            }
+                            return '<span>'+typeName+'</span>';
+                        }}
+                        , {field: 'createTime', title: '创建时间'}
+                        , {title: '操作', width: 70, toolbar: '#bar'}
+                    ]
+                ]
+                ,parseData: function(res){ //将原始数据解析成 table 组件所规定的数据
+                        return {
+                            "code": res.result.code, //解析接口状态
+                            "msg": res.message, //解析提示文本
+                            "count": res.data.total, //解析数据长度
+                            "data": res.data.records //解析数据列表
+                        };
+                    }
+                });
+
+            //监听工具条
+            table.on('tool(QuestionTable)', function (obj) {
+                var data = obj.data;
+                switch (obj.event) {
+                    case 'detail':
+                        layer.open({
+                            type: 1,
+                            area: ['800px', '520px'],
+                            shadeClose: true, //点击遮罩关闭
+                            title: '查看题目',
+                            content: $('#questionInfoFrame'),
+                            success: function (index, layero) {
+                                $("#questionInfo")[0].reset();
+                                $("#content").val(data.content);
+                                $("#radio_answer_area2").html('');
+                                $("#multiple_answer_area2").html('');
+                                $("#type").val(data.type);
+                                $("#type").attr("disabled",'disabled');
+                                $("#content").attr("disabled",'disabled');
+                                $.ajax({
+                                    url : '/question/getDetail/'+data.id,
+                                    type : 'get',
+                                    dataType: 'json',
+                                    async: false,
+                                    success : function(n) {
+                                        if (n.result.status) {
+                                            $("#radio_answer_area").css("display", 'none');
+                                            $("#multiple_answer_area").css("display", 'none');
+                                            $("#judge_answer_area").css("display", 'none');
+                                            if(data.type === 1){
+                                                $("#radio_answer_area").css("display", 'inline');
+                                                $.each(n.data.answerList, function (index, val) {
+                                                    var tmp = '';
+                                                    if(val.correctFlag==1){
+                                                        tmp ='<i class="layui-icon layui-icon-ok-circle" style="font-size: 20px; color: #5FB878;"></i>';
+                                                    }
+                                                    var str = '<div class="layui-form-item" style="display: flex;align-items: center;">\n' +
+                                                        '    <label class="layui-form-label">选项&nbsp;</label>\n' +
+                                                        '    <div class="layui-input-inline" style="width: 490px">\n' +
+                                                        '        <input disabled value="'+val.content+'" name="radioAnswer" type="text" autocomplete="off" class="layui-input">\n' +
+                                                        '    </div>\n' +tmp+
+                                                        '</div>';
+                                                    $("#radio_answer_area").append(str);
+                                                    layui.form.render();
+                                                });
+                                            }else if(data.type === 2){
+                                                $("#multiple_answer_area").css("display", 'inline');
+                                                $.each(n.data.answerList, function (index, val) {
+                                                    var tmp = '';
+                                                    if(val.correctFlag==1){
+                                                        tmp ='<i class="layui-icon layui-icon-ok-circle" style="font-size: 20px; color: #5FB878;"></i>';
+                                                    }
+                                                    var str = '<div class="layui-form-item" style="display: flex;align-items: center;">\n' +
+                                                        '    <label class="layui-form-label">选项&nbsp;</label>\n' +
+                                                        '    <div class="layui-input-inline" style="width: 490px">\n' +
+                                                        '        <input disabled value="'+val.content+'" name="multipleAnswer" type="text" autocomplete="off" class="layui-input">\n' +
+                                                        '    </div>\n' +tmp+
+                                                        '</div>';
+                                                    $("#multiple_answer_area").append(str);
+                                                    layui.form.render();
+                                                });
+                                            }else if(data.type === 3){
+                                                $("#judge_answer_area").css("display", 'inline');
+                                                var tmp = '';
+                                                if(n.data.judgeCorrection === "1"){
+                                                    tmp ='<i class="layui-icon layui-icon-ok" style="font-size: 40px; color: #5FB878;font-weight:bold;"></i>';
+                                                }else{
+                                                    tmp ='<i class="layui-icon layui-icon-close" style="font-size: 40px; color: #5FB878;font-weight:bold;"></i>';
+                                                }
+                                                $("#judge_answer").append(tmp);
+                                                layui.form.render();
+                                            }else{
+                                                layer.msg("系统错误",{icon:'5'});
+                                                layer.close(index);
+                                            }
+                                        }else {
+                                            layer.msg("查询题目信息失败,"+n.result.msg);
+                                        }
+                                    },
+                                    error: function(n) {
+                                        layer.msg("查询题目信息失败,"+n.responseJSON.result.msg);
+                                    }
+                                });
+                                layui.form.render();
+                            },
+                            end: function (res) {
+                                $("#radio_answer_area").html("");
+                                $("#multiple_answer_area").html("");
+                                $("#questionInfoFrame").css("display", 'none');
+                            }
+                        });
+                        break;
+                }
+                ;
+            });
+
+            $("#searchBtn").click(function (){
+                tableIns.reload({
+                    where: {
+                        "msg":"",
+                        "code":"",
+                        "data": {
+                            "content": $('#search-content').val(),
+                            "startDate": $("#search-createTime").val().split(" - ")[0],
+                            "endTime": $("#search-createTime").val().split(" - ")[1]!=null?$("#search-createTime").val().split(" - ")[1]:"",
+                            "type": $('#search-type').val()
+                        }
+                    }
+                    , page: {
+                        curr: 1 //重新从第 1 页开始
+                    }
+                });
+            });
+
+        });
+
+    </script>
+</head>
+<body>
+<div class="layui-layout layui-layout-admin">
+    <div th:replace="front-common::header('grade')"></div>
+
+    <div class="layui-layout-body" style="margin-top: 50px;background-color: #f8f8f8;">
+        <div class="layui-container container">
+            <div th:replace="front-common::gradeSide('wrongquestion')"></div>
+            <div class="content">
+                <div class="layui-fluid" >
+                    <fieldset class="layui-elem-field layui-field-title" style="margin-top: 50px;">
+                        <legend>我的错题</legend>
+                    </fieldset>
+
+                    <div class="layui-card">
+                        <form class="layui-form layui-card-header" lay-filter="searchQuestionInfoForm" id="searchQuestionInfoForm" style="padding: 15px;height: auto">
+                            <div class="layui-form-item" style="margin-bottom: 0">
+                                <div style="width: 30%" class="layui-inline">
+                                    <input style="width: 100%" class="layui-input" id="search-content" autocomplete="off" placeholder="题目名">
+                                </div>
+                                <div style="width: 30%" class="layui-inline">
+                                    <input style="width: 100%" type="text" id="search-createTime" placeholder="创建时间" autocomplete="off" class="layui-input">
+                                </div>
+                            </div>
+                            <div class="layui-form-item" style="margin-bottom: 0">
+                                <div class="layui-inline" style="margin-right:20px;">
+                                    <select id="search-type">
+                                        <option value="1">单选题</option>
+                                        <option value="2">多选题</option>
+                                        <option value="3">判断题</option>
+                                    </select>
+                                </div>
+
+                                <div class="layui-inline" style="float: right;">
+                                    <button type="button" class="layui-btn" id="searchBtn">
+                                        <i class="layui-icon layui-icon-search"></i> 搜索
+                                    </button>
+                                </div>
+                            </div>
+                        </form>
+
+                        <div class="layui-card-body">
+                            <div style="padding-bottom:10px;">
+                                <table class="layui-hide" id="QuestionTable" lay-skin="line" lay-filter="QuestionTable">
+                                </table>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div th:replace="front-common::footer"></div>
+    </div>
+
+</div>
+
+</body>
+<div id="questionInfoFrame" style="display:none;">
+    <form class="layui-form" lay-filter="questionInfo" id="questionInfo" style="padding-right:30px">
+        <div class="layui-form-item" style="margin-top: 30px">
+            <label class="layui-form-label">题目</label>
+            <div class="layui-input-block">
+                <textarea id="content" placeholder="请输入题目" autocomplete="off" class="layui-textarea"></textarea>
+            </div>
+        </div>
+        <div class="layui-form-item">
+            <label class="layui-form-label">题目类型</label>
+            <div class="layui-input-block" >
+                <select id="type" lay-filter="type">
+                    <option value="1">单选题</option>
+                    <option value="2">多选题</option>
+                    <option value="3">判断题</option>
+                </select>
+            </div>
+        </div>
+        <fieldset class="layui-elem-field layui-field-title" style="margin-top: 30px;">
+            <legend>选项</legend>
+        </fieldset>
+        <div id="radio_answer_area" style="display:none;">
+        </div>
+        <div id="multiple_answer_area" style="display:none;">
+        </div>
+        <div id="judge_answer_area" style="display:none;">
+            <div class="layui-form-item" style="display: flex;align-items: center;">
+                <label class="layui-form-label">选项&nbsp;</label>
+                <div class="layui-input-inline" id="judge_answer" >
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+</html>

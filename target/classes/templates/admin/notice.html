@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:shiro="http://www.pollix.at/thymeleaf/shiro">
+<head th:replace="admin/end-common::commonCss(~{::title},~{},~{::script},~{::style})">
+    <title>JAVA在线考试-公告管理</title>
+
+    <script th:src="@{/laydate/laydate.js}"></script>
+    <style>
+        .body{
+            background-color: #f8f8f8;
+        }
+    </style>
+
+    <script type="text/html" id="toolbar">
+        <div class="layui-btn-container">
+            <button lay-event="deletes" class="layui-btn layui-btn-danger">删除选中行</button>
+            <button lay-event="save" class="layui-btn layui-btn-normal">新增</button>
+        </div>
+    </script>
+    <script type="text/html" id="bar">
+        <a class="layui-btn layui-btn-xs" lay-event="edit">编辑</a>
+        <a class="layui-btn layui-btn-danger layui-btn-xs" lay-event="delete">删除</a><br/>
+    </script>
+    <script th:inline="javascript">
+        layui.use(['table','element','laydate','form'], function(){
+            var table = layui.table;
+            var element = layui.element;
+            var laydate = layui.laydate;
+            var form = layui.form;
+
+            laydate.render({
+                elem: '#search-createTime'
+                ,range: true
+            });
+
+            $("#searchBtn").click(function () {
+                reload();
+            });
+            $("#resetBtn").click(function () {
+                $("#searchnoticeInfoForm")[0].reset();
+                tableIns.reload({
+                    where: {
+                        "msg": "",
+                        "code": "",
+                        "data": {
+                            "title": '',
+                            "content": '',
+                            "startTime": '',
+                            "endTime": ''
+                        }
+                    }
+                    , page: {
+                        curr: 1
+                    }
+                });
+            });
+
+            var tableIns = table.render({
+                elem: '#noticeTable'
+                , url: '/sys/notice/listForPage'
+                , toolbar: '#toolbar'
+                , contentType: 'application/json'
+                , method: 'post'
+                , where: {
+                    "msg": "",
+                    "code": "",
+                    "data": {
+                        "title": $('#search-title').val(),
+                        "content": $('#search-content').val(),
+                        "startTime": $("#search-createTime").val().split(" - ")[0],
+                        "endTime": $("#search-createTime").val().split(" - ")[1] != null ? $("#search-createTime").val().split(" - ")[1] : ""
+                    }
+                }
+                , defaultToolbar: []
+                , page: true
+                , limits: [5, 10, 20]
+                , limit: 10
+                , cols: [
+                    [
+                        {type: 'checkbox', fixed: 'left'}
+                        , {field: 'id', title: 'ID', hide: true}
+                        , {field: 'title', title: '公告名'}
+                        , {field: 'content', title: '内容'}
+                        , {field: 'createTime', title: '创建时间'}
+                        , {title: '操作', fixed: 'right', width: 135, toolbar: '#bar'}
+                    ]
+                ]
+                , done: function (res, curr, count) {
+                    //初始化高度，使得冻结行表体高度一致
+                    $(".layui-table-body tr").each(function (index, val) {
+                        $($(".layui-table-fixed .layui-table-body table tr")[index]).height($(val).height());
+                    });
+                    //动态监听表体高度变化，冻结行跟着改变高度
+                    $(".layui-table-body tr").resize(function () {
+                        $(".layui-table-body  tr").each(function (index, val) {
+                            $($(".layui-table-fixed .layui-table-body table tr")[index]).height($(val).height());
+                        });
+                    });
+                    $(".layui-table-header tr").resize(function () {
+                        $(".layui-table-header  tr").each(function (index, val) {
+                            $($(".layui-table-fixed .layui-table-header table tr")[index]).height($(val).height());
+                        });
+                    });
+                    //初始化高度，使得冻结行表头高度一致
+                    $(".layui-table-header tr").each(function (index, val) {
+                        $($(".layui-table-fixed .layui-table-header table tr")[index]).height($(val).height());
+                    });
+                }
+                ,parseData: function(res){ //将原始数据解析成 table 组件所规定的数据
+                    return {
+                        "code": res.result.code, //解析接口状态
+                        "msg": res.message, //解析提示文本
+                        "count": res.data.total, //解析数据长度
+                        "data": res.data.records //解析数据列表
+                    };
+                }
+            });
+
+            //监听工具条
+            table.on('tool(noticeTable)', function (obj) {
+                var data = obj.data;
+                switch (obj.event) {
+                    case 'delete':
+                        layer.confirm('真的删除么', function (index) {
+                            $.ajax({
+                                url : '/sys/notice/delete/'+data.id,
+                                type : 'post',
+                                dataType : 'json',
+                                success : function(n) {
+                                    if (n.result.status) {
+                                        reload();
+                                    }else {
+                                        layer.msg("删除公告失败,"+n.result.msg);
+                                    }
+                                },
+                                error: function(n) {
+                                    layer.msg("删除公告失败,"+n.responseJSON.result.msg);
+                                }
+                            });
+                            layer.close(index);
+                        });
+                        break;
+                    case 'edit':
+                        layer.open({
+                            type: 1,
+                            area: ['800px', '350px'],
+                            shadeClose: true, //点击遮罩关闭
+                            title: '修改公告信息',
+                            btn: ['确定', '取消'],
+                            content: $('#noticeInfoFrame'),
+                            success: function (index, layero) {
+                                $("#noticeInfoForm")[0].reset();
+                                $("#title").val(data.title);
+                                $("#content").val(data.content);
+                                layui.form.render();
+                            },
+                            yes: function (index, layero) {
+                                var title = $("#title").val();
+                                var content = $("#content").val();
+                                if(title===''){
+                                    layer.msg("请输入公告名",{icon:'5'});
+                                    return;
+                                }
+                                if(content===''){
+                                    layer.msg("请输入内容",{icon:'5'});
+                                    return;
+                                }
+                                $.ajax({
+                                    url : '/sys/notice/update/'+data.id,
+                                    type : 'post',
+                                    contentType : 'application/json',
+                                    dataType: 'json',
+                                    data: JSON.stringify({
+                                        "msg":"",
+                                        "code":"",
+                                        "data": {
+                                            "title": title,
+                                            "content": content
+                                        }
+                                    }),
+                                    success : function(n) {
+                                        if (n.result.status) {
+                                            layer.msg("修改公告信息成功");
+                                            layer.close(index);
+                                            reload();
+                                        }else {
+                                            layer.msg("修改公告信息失败,"+n.result.msg);
+                                        }
+                                    },
+                                    error: function(n) {
+                                        layer.msg("修改公告信息失败,"+n.responseJSON.result.msg);
+                                    }
+                                });
+                            },
+                            end: function (res) {
+                                $("#noticeInfoFrame").css("display", 'none');
+                            }
+                        });
+                        break;
+                }
+                ;
+            });
+            table.on('toolbar(noticeTable)', function (obj) {
+                var checkStatus = table.checkStatus(obj.config.id);
+                switch (obj.event) {
+                    case 'deletes':
+                        var data = checkStatus.data;
+                        var size = data.length;
+                        console.log(data);
+                        if (size != 0) {
+                            layer.confirm('真的删除么', function (index) {
+                                for (let i = 0; i < size; i++) {
+                                    $.ajax({
+                                        url : '/sys/notice/delete/'+data[i].id,
+                                        type : 'post',
+                                        dataType : 'json',
+                                        success : function(n) {
+                                            if (n.result.status) {
+                                                reload();
+                                            }else {
+                                                layer.msg("删除公告失败,"+n.result.msg);
+                                            }
+                                        },
+                                        error: function(n) {
+                                            layer.msg("删除公告失败,"+n.responseJSON.result.msg);
+                                        }
+                                    });
+                                }
+                                layer.close(index);
+                                reload();
+                            });
+                        } else {
+                            layer.msg("请勾选要删除的公告");
+                        }
+                        break;
+                    case 'save':
+                        layer.open({
+                            type: 1,
+                            area: ['800px', '350px'],
+                            shadeClose: true, //点击遮罩关闭
+                            title: '添加公告',
+                            btn: ['确定', '取消'],
+                            content: $('#noticeInfoFrame'),
+                            success: function (index, layero) {
+                                $("#noticeInfoForm")[0].reset();
+                                layui.form.render();
+                            },
+                            yes: function (index, layero) {
+                                var title = $("#title").val();
+                                var content = $("#content").val();
+                                if(title===''){
+                                    layer.msg("请输入公告名",{icon:'5'});
+                                    return;
+                                }
+                                if(content===''){
+                                    layer.msg("请输入内容",{icon:'5'});
+                                    return;
+                                }
+
+                                var formFile = new FormData(document.getElementById('noticeInfoForm'));
+                                console.log(JSON.stringify(formFile));
+                                $.ajax({
+                                    url : '/sys/notice/save',
+                                    type : 'post',
+                                    contentType : 'application/json',
+                                    dataType: 'json',
+                                    data: JSON.stringify({
+                                        "msg":"",
+                                        "code":"",
+                                        "data": {
+                                            "title": title,
+                                            "content": content,
+                                        }
+                                    }),
+                                    success : function(n) {
+                                        if (n.result.status) {
+                                            layer.msg("添加公告成功");
+                                            layer.close(index);
+                                            reload();
+                                        }else {
+                                            layer.msg("添加公告失败,"+n.result.msg);
+                                        }
+                                    },
+                                    error: function(n) {
+                                        layer.msg("添加公告失败,"+n.responseJSON.result.msg);
+                                    }
+                                });
+                            },
+                            end: function (res) {
+                                $("#noticeInfoFrame").css("display", 'none');
+                            }
+                        });
+                        break;
+                }
+                ;
+            });
+
+            function reload() {
+                tableIns.reload({
+                    where: {
+                        "msg": "",
+                        "code": "",
+                        "data": {
+                            "title": $('#search-title').val(),
+                            "content": $('#search-content').val(),
+                            "startTime": $("#search-createTime").val().split(" - ")[0],
+                            "endTime": $("#search-createTime").val().split(" - ")[1] != null ? $("#search-createTime").val().split(" - ")[1] : ""
+                        }
+                    }
+                    , page: {
+                        curr: 1 //重新从第 1 页开始
+                    }
+                });
+            }
+
+        });
+
+    </script>
+</head>
+<body>
+<div class="layui-layout layui-layout-admin">
+
+    <div th:replace="admin/end-common::header"></div>
+    <div th:replace="admin/end-common::side('notice')"></div>
+
+    <div class="layui-body body">
+        <div class="layui-fluid" style="padding: 15px;">
+            <div class="layui-card">
+                <form class="layui-form layui-card-header" style="padding: 15px" lay-filter="searchnoticeInfoForm" id="searchnoticeInfoForm">
+                    <div class="layui-form-item">
+                        <div class="layui-inline" style="width:150px;">
+                            <input class="layui-input" id="search-title" autocomplete="off" placeholder="公告名">
+                        </div>
+                        <div class="layui-inline" style="width:250px;">
+                            <input class="layui-input" id="search-content" autocomplete="off" placeholder="内容">
+                        </div>
+                        <div class="layui-inline">
+                            <input type="text" id="search-createTime" placeholder="创建时间" autocomplete="off" class="layui-input">
+                        </div>
+                        <div class="layui-inline" style="float: right;">
+                            <button type="button" class="layui-btn" id="searchBtn">
+                                <i class="layui-icon layui-icon-search"></i> 搜索
+                            </button>
+                            <button  type="button" class="layui-btn" id="resetBtn">重置</button>
+                        </div>
+
+                    </div>
+                </form>
+
+                <div class="layui-card-body">
+                    <div style="padding-bottom:10px;">
+                        <table class="layui-hide" id="noticeTable" lay-skin="line" lay-filter="noticeTable">
+                        </table>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+    </div>
+
+    <div th:replace="admin/end-common::footer"></div>
+</div>
+
+</body>
+<div id="noticeInfoFrame" style="display:none;">
+    <form class="layui-form" lay-filter="noticeInfoForm" id="noticeInfoForm" style="padding-right:30px">
+        <div class="layui-form-item" style="margin-top: 30px">
+            <label class="layui-form-label">公告名</label>
+            <div class="layui-input-block">
+                <input id="title" type="text" placeholder="请输入公告名" autocomplete="off" class="layui-input">
+            </div>
+        </div>
+        <div class="layui-form-item" style="margin-top: 30px">
+            <label class="layui-form-label">内容</label>
+            <div class="layui-input-block">
+                <textarea id="content" placeholder="请输入内容" autocomplete="off" class="layui-textarea"></textarea>
+            </div>
+        </div>
+    </form>
+</div>
+</html>

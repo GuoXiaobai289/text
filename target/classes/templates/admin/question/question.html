@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:shiro="http://www.pollix.at/thymeleaf/shiro">
+<head th:replace="admin/end-common::commonCss(~{::title},~{},~{::script},~{::style})">
+    <title>JAVA在线考试-题目管理</title>
+    <script th:src="@{/layui/xm-select.js}"></script>
+    <script th:src="@{/laydate/laydate.js}"></script>
+    <style>
+        .body{
+            background-color: #f8f8f8;
+        }
+    </style>
+
+    <script type="text/html" id="toolbar">
+        <div class="layui-btn-container">
+            <button lay-event="deletes" class="layui-btn layui-btn-danger">删除选中行</button>
+            <button lay-event="save" class="layui-btn layui-btn-normal">新增</button>
+        </div>
+    </script>
+    <script type="text/html" id="bar">
+        <a class="layui-btn layui-btn-xs" lay-event="edit">编辑</a>
+        <a class="layui-btn layui-btn-danger layui-btn-xs" lay-event="delete">删除</a><br/>
+        <a class="layui-btn layui-btn-warm layui-btn-xs" lay-event="lock">封禁/解封</a>
+    </script>
+    <script th:inline="javascript">
+        layui.use(['table','element','laydate','form'], function(){
+            var table = layui.table;
+            var element = layui.element;
+            var laydate = layui.laydate;
+            var form = layui.form;
+
+            var repoIds = xmSelect.render({
+                el: '#repoIds'
+            })
+
+            laydate.render({
+                elem: '#search-createTime'
+                ,range: true
+            });
+
+            $("#searchBtn").click(function () {
+                reload();
+            });
+            $("#resetBtn").click(function () {
+                $("#searchQuestionInfoForm")[0].reset();
+                tableIns.reload({
+                    where: {
+                        "msg":"",
+                        "code":"",
+                        "data": {
+                            "content": '',
+                            "startDate": '',
+                            "endTime": '',
+                            "type": 1
+                        }
+                    }
+                    , page: {
+                        curr: 1
+                    }
+                });
+            });
+
+            var tableIns = table.render({
+                elem: '#QuestionTable'
+                , url: '/question/listForPage'
+                , toolbar: '#toolbar'
+                , contentType: 'application/json'
+                , method: 'post'
+                , where: {
+                    "msg":"",
+                    "code":"",
+                    "data": {
+                        "content": $('#search-content').val(),
+                        "startDate": $("#search-createTime").val().split(" - ")[0],
+                        "endTime": $("#search-createTime").val().split(" - ")[1]!=null?$("#search-createTime").val().split(" - ")[1]:"",
+                        "type": $('#search-type').val()
+                    }
+                }
+                , defaultToolbar: []
+                , page: true
+                , limits: [5, 10, 20]
+                , limit: 10
+                , cols: [
+                    [
+                        {type: 'checkbox', fixed: 'left'}
+                        , {field: 'id', title: 'ID', hide: true}
+                        , {field: 'content', title: '题目'}
+                        , {field: 'type', title: '类型', templet: function (d) {
+                            var type = d.type * 1;
+                            var typeName = '其它';
+                            if (type === 1) {
+                                typeName = '单选题';
+                            } else if (type === 2) {
+                                typeName = '多选题';
+                            } else if (type === 3) {
+                                typeName = '判断题';
+                            }
+                            return '<span>'+typeName+'</span>';
+                        }}
+                        , {field: 'createTime', title: '创建时间'}
+                        , {title: '操作', fixed: 'right', width: 135, toolbar: '#bar'}
+                    ]
+                ]
+            ,parseData: function(res){ //将原始数据解析成 table 组件所规定的数据
+                    return {
+                        "code": res.result.code, //解析接口状态
+                        "msg": res.message, //解析提示文本
+                        "count": res.data.total, //解析数据长度
+                        "data": res.data.records //解析数据列表
+                    };
+                }
+            });
+
+            //监听工具条
+            table.on('tool(QuestionTable)', function (obj) {
+                var data = obj.data;
+                switch (obj.event) {
+                    case 'delete':
+                        layer.confirm('真的删除么', function (index) {
+                            $.ajax({
+                                url : '/question/delete/'+data.id,
+                                type : 'post',
+                                dataType : 'json',
+                                success : function(n) {
+                                    if (n.result.status) {
+                                        reload();
+                                    }else {
+                                        layer.msg("删除题目失败,"+n.result.msg);
+                                    }
+                                },
+                                error: function(n) {
+                                    layer.msg("删除题目失败,"+n.responseJSON.result.msg);
+                                }
+                            });
+                            layer.close(index);
+                        });
+                        break;
+                    case 'edit':
+                        layer.open({
+                            type: 1,
+                            area: ['800px', '520px'],
+                            shadeClose: true, //点击遮罩关闭
+                            title: '修改题目信息',
+                            btn: ['确定', '取消'],
+                            content: $('#questionInfoFrame'),
+                            success: function (index, layero) {
+                                $("#questionInfoForm")[0].reset();
+                                $("#content").val(data.content);
+                                $("#radio_answer_area2").html('');
+                                $("#multiple_answer_area2").html('');
+                                $("#type").val(data.type);
+                                $("#type").attr("disabled",'disabled');
+                                $.ajax({
+                                    url : '/question/getDetail/'+data.id,
+                                    type : 'get',
+                                    dataType: 'json',
+                                    async: false,
+                                    success : function(n) {
+                                        if (n.result.status) {
+                                            $("#radio_answer_area").css("display", 'none');
+                                            $("#multiple_answer_area").css("display", 'none');
+                                            $("#judge_answer_area").css("display", 'none');
+                                            if(data.type === 1){
+                                                $("#radio_answer_area").css("display", 'inline');
+                                                radioNum = 1;
+                                                $.each(n.data.answerList, function (index, val) {
+                                                    if(index==0){
+                                                        $("#firstRadioAnswer").val(val.content);
+                                                        $("#firstRadioCorrection").val(val.correctFlag);
+                                                    }else{
+                                                        var tmp = '';
+                                                        if(val.correctFlag==1){
+                                                            tmp = 'checked=""';
+                                                        }
+                                                        var str = '<div class="layui-form-item" style="display: flex;align-items: center;">\n' +
+                                                            '    <label class="layui-form-label">选项&nbsp;</label>\n' +
+                                                            '    <div class="layui-input-inline" style="width: 490px">\n' +
+                                                            '        <input value="'+val.content+'" name="radioAnswer" type="text" autocomplete="off" class="layui-input">\n' +
+                                                            '    </div>\n' +
+                                                            '   <div class="layui-input-inline" style="margin-left: 10px;width: 100px">\n' +
+                                                            '       <input '+tmp+'  type="radio" name="isCorrect" title="正确">\n' +
+                                                            '   </div>\n' +
+                                                            '    <div class="layui-input-inline" style="margin-left: 30px;width: 50px">\n' +
+                                                            '        <button type="button" class="layui-btn layui-btn-danger layui-btn-sm removeclass">\n' +
+                                                            '            <i class="layui-icon layui-icon-subtraction"></i>\n' +
+                                                            '        </button>\n' +
+                                                            '    </div>\n' +
+                                                            '</div>';
+                                                        $("#radio_answer_area2").append(str);
+                                                    }
+                                                    radioNum++;
+                                                    layui.form.render();
+                                                });
+                                            }else if(data.type === 2){
+                                                $("#multiple_answer_area").css("display", 'inline');
+                                                multipleNum = 1;
+                                                $.each(n.data.answerList, function (index, val) {
+                                                    if(index==0){
+                                                        $("#firstMultipleAnswer").val(val.content);
+                                                        $("#firstMultipleCorrection").val(val.correctFlag);
+                                                    }else{
+                                                        var tmp = '';
+                                                        if(val.correctFlag=="1"){
+                                                            tmp = 'checked=""';
+                                                        }
+                                                        var str = '<div class="layui-form-item" style="display: flex;align-items: center;">\n' +
+                                                            '    <label class="layui-form-label">选项&nbsp;</label>\n' +
+                                                            '    <div class="layui-input-inline" style="width: 490px">\n' +
+                                                            '        <input value="'+val.content+'" name="multipleAnswer" type="text" autocomplete="off" class="layui-input">\n' +
+                                                            '    </div>\n' +
+                                                            '    <div class="layui-input-inline" style="margin-left: 10px;width: 100px">\n' +
+                                                            '        <input '+tmp+' type="checkbox" name="isCorrects" lay-text="正确|错误" lay-skin="switch">\n' +
+                                                            '    </div>\n' +
+                                                            '    <div class="layui-input-inline" style="margin-left: 30px;width: 50px">\n' +
+                                                            '        <button type="button" class="layui-btn layui-btn-danger layui-btn-sm removeclass">\n' +
+                                                            '            <i class="layui-icon layui-icon-subtraction"></i>\n' +
+                                                            '        </button>\n' +
+                                                            '    </div>\n' +
+                                                            '</div>';
+                                                        $("#multiple_answer_area2").append(str);
+                                                    }
+                                                    multipleNum++;
+                                                    layui.form.render();
+                                                });
+                                            }else if(data.type === 3){
+                                                $("#judge_answer_area").css("display", 'inline');
+                                                if(n.data.judgeCorrection === "1"){
+                                                    $("#correct").attr("checked",true);
+                                                }else{
+                                                    $("#correct").removeAttr("checked");
+                                                }
+                                            }else{
+                                                layer.msg("系统错误",{icon:'5'});
+                                                layer.close(index);
+                                            }
+                                        }else {
+                                            layer.msg("查询题目信息失败,"+n.result.msg);
+                                        }
+                                    },
+                                    error: function(n) {
+                                        layer.msg("查询题目信息失败,"+n.responseJSON.result.msg);
+                                    }
+                                });
+                                $.ajax({
+                                    url: '/repo/list',
+                                    type:"get",
+                                    dataType:"json",
+                                    success:function (data){
+                                        if (data.result.status) {
+                                            var text = '[' ;
+                                            $.each(data.data,function (i,n){
+                                                text +='{ "name":"'+n.title+'" , "value":"'+n.id+'" },';
+                                            });
+                                            text = text.substr(0, text.length - 1);
+                                            text += ']' ;
+                                            repoIds.update({
+                                                data: JSON.parse(text)
+                                            })
+                                        }else {
+                                            layer.msg("查询题库列表失败,"+n.result.msg);
+                                        }
+                                        form.render(null,"questionInfoForm");
+                                    }
+                                });
+                                $.ajax({
+                                    url: '/repo/listByQuestionId/'+data.id,
+                                    type:"get",
+                                    dataType:"json",
+                                    success:function (data){
+                                        if (data.result.status) {
+                                            var arrayObj = new Array();
+                                            $.each(data.data,function (i,n){
+                                                arrayObj.push(n.id);
+                                            });
+                                            repoIds.setValue(arrayObj)
+                                        }else {
+                                            layer.msg("查询题库列表失败,"+n.result.msg);
+                                        }
+                                        form.render(null,"questionInfoForm");
+                                    }
+                                });
+                                layui.form.render();
+                            },
+                            yes: function (index, layero) {
+                                var content = $("#content").val();
+                                var type = data.type;
+                                var repos = repoIds.getValue('value');
+
+                                if(content===''){
+                                    layer.msg("请输入题目",{icon:'5'});
+                                    return;
+                                }
+                                if(repos.length<=0){
+                                    layer.msg("至少要选择一个题库",{icon:'5'});
+                                    return;
+                                }
+                                var json = null;
+                                if(type === 1){
+                                    var answers = $("*[name='radioAnswer']").map(function(){return $(this).val()}).get();
+                                    var isCorrect = $("*[name='isCorrect']").map(function(){return $(this).is(':checked')?1:0}).get();
+                                    json = JSON.stringify({
+                                        "msg":"",
+                                        "code":"",
+                                        "data": {
+                                            "content": content,
+                                            "type": type,
+                                            "radioCorrectionList": isCorrect,
+                                            "radioAnswerList": answers,
+                                            "repoIds": repos
+                                        }
+                                    });
+                                }else if(type === 2){
+                                    var answers = $("*[name='multipleAnswer']").map(function(){return $(this).val()}).get();
+                                    var isCorrect = $("*[name='isCorrects']").map(function(){return $(this).is(':checked')?1:0}).get();
+                                    json = JSON.stringify({
+                                        "msg":"",
+                                        "code":"",
+                                        "data": {
+                                            "content": content,
+                                            "type": type,
+                                            "multipleCorrectionList": isCorrect,
+                                            "multipleAnswerList": answers,
+                                            "repoIds": repos
+                                        }
+                                    });
+                                }else if(type === 3){
+                                    json = JSON.stringify({
+                                        "msg": "",
+                                        "code": "",
+                                        "data": {
+                                            "content": content,
+                                            "type": type,
+                                            "judgeCorrection": $('#correct').is(':checked')?1:0,
+                                            "repoIds": repos
+                                        }
+                                    });
+                                }else{
+                                    layer.msg("系统错误",{icon:'5'});
+                                    reload();
+                                    return;
+                                }
+                                $.ajax({
+                                    url : '/question/update/'+data.id,
+                                    type : 'post',
+                                    contentType : 'application/json',
+                                    dataType: 'json',
+                                    data: json,
+                                    success : function(n) {
+                                        if (n.result.status) {
+                                            layer.msg("添加题目成功");
+                                            layer.close(index);
+                                            reload();
+                                        }else {
+                                            layer.msg("添加题目失败,"+n.result.msg);
+                                        }
+                                    },
+                                    error: function(n) {
+                                        layer.msg("添加题目失败,"+n.responseJSON.result.msg);
+                                    }
+                                });
+                            },
+                            end: function (res) {
+                                multipleNum = 1;
+                                radioNum = 1;
+                                $("#username").removeAttr("disabled");
+                                $("#questionInfoFrame").css("display", 'none');
+                            }
+                        });
+                        break;
+                }
+                ;
+            });
+            table.on('toolbar(QuestionTable)', function (obj) {
+                var checkStatus = table.checkStatus(obj.config.id);
+                switch (obj.event) {
+                    case 'deletes':
+                        var data = checkStatus.data;
+                        var size = data.length;
+                        console.log(data);
+                        if (size != 0) {
+                            layer.confirm('真的删除么', function (index) {
+                                for (let i = 0; i < size; i++) {
+                                    $.ajax({
+                                        url : '/question/delete/'+data[i].id,
+                                        type : 'post',
+                                        dataType : 'json',
+                                        success : function(n) {
+                                            if (n.result.status) {
+                                                reload();
+                                            }else {
+                                                layer.msg("删除题目失败,"+n.result.msg);
+                                            }
+                                        },
+                                        error: function(n) {
+                                            layer.msg("删除题目失败,"+n.responseJSON.result.msg);
+                                        }
+                                    });
+                                }
+                                layer.close(index);
+                                reload();
+                            });
+                        } else {
+                            layer.msg("请勾选要删除的题目");
+                        }
+                        break;
+                    case 'save':
+                        layer.open({
+                            type: 1,
+                            area: ['800px', '520px'],
+                            shadeClose: true, //点击遮罩关闭
+                            title: '添加题目',
+                            btn: ['确定', '取消'],
+                            content: $('#questionInfoFrame'),
+                            success: function (index, layero) {
+                                $("#questionInfoForm")[0].reset();
+                                $("#radio_answer_area").css("display", 'inline');
+                                $("#multiple_answer_area").css("display", 'none');
+                                $("#judge_answer_area").css("display", 'none');
+                                $("#radio_answer_area2").html('');
+                                $("#multiple_answer_area2").html('');
+                                $("#type").attr("disabled",false);
+                                $.ajax({
+                                    url: '/repo/list',
+                                    type:"get",
+                                    dataType:"json",
+                                    success:function (data){
+                                        if (data.result.status) {
+                                            var text = '[' ;
+                                            $.each(data.data,function (i,n){
+                                                text +='{ "name":"'+n.title+'" , "value":"'+n.id+'" },';
+                                            });
+                                            text = text.substr(0, text.length - 1);
+                                            text += ']' ;
+                                            repoIds.update({
+                                                data: JSON.parse(text)
+                                            })
+                                        }else {
+                                            layer.msg("查询题库列表失败,"+n.result.msg);
+                                        }
+                                        form.render(null,"questionInfoForm");
+                                    }
+                                });
+                                layui.form.render();
+                            },
+                            yes: function (index, layero) {
+                                var content = $("#content").val();
+                                var type = $("#type").val()*1;
+                                var repos = repoIds.getValue('value');
+                                if(content===''){
+                                    layer.msg("请输入题目",{icon:'5'});
+                                    return;
+                                }
+                                if(repos.length<=0){
+                                    layer.msg("至少要选择一个题库",{icon:'5'});
+                                    return;
+                                }
+                                var json = null;
+                                if(type === 1){
+                                    var answers = $("*[name='radioAnswer']").map(function(){return $(this).val()}).get();
+                                    var isCorrect = $("*[name='isCorrect']").map(function(){return $(this).is(':checked')?1:0}).get();
+                                    json = JSON.stringify({
+                                        "msg":"",
+                                        "code":"",
+                                        "data": {
+                                            "content": content,
+                                            "type": type,
+                                            "radioCorrectionList": isCorrect,
+                                            "radioAnswerList": answers,
+                                            "repoIds": repos
+                                        }
+                                    });
+                                }else if(type === 2){
+                                    var answers = $("*[name='multipleAnswer']").map(function(){return $(this).val()}).get();
+                                    var isCorrect = $("*[name='isCorrects']").map(function(){return $(this).is(':checked')?1:0}).get();
+                                    json = JSON.stringify({
+                                        "msg":"",
+                                        "code":"",
+                                        "data": {
+                                            "content": content,
+                                            "type": type,
+                                            "multipleCorrectionList": isCorrect,
+                                            "multipleAnswerList": answers,
+                                            "repoIds": repos
+                                        }
+                                    });
+                                }else if(type === 3){
+                                    json = JSON.stringify({
+                                        "msg": "",
+                                        "code": "",
+                                        "data": {
+                                            "content": content,
+                                            "type": type,
+                                            "judgeCorrection": $('#correct').is(':checked')?1:0,
+                                            "repoIds": repos
+                                        }
+                                    });
+                                }else{
+                                    layer.msg("系统错误",{icon:'5'});
+                                    reload();
+                                    return;
+                                }
+                                $.ajax({
+                                    url : '/question/save',
+                                    type : 'post',
+                                    contentType : 'application/json',
+                                    dataType: 'json',
+                                    data: json,
+                                    success : function(n) {
+                                        if (n.result.status) {
+                                            layer.msg("添加题目成功");
+                                            layer.close(index);
+                                            reload();
+                                        }else {
+                                            layer.msg("添加题目失败,"+n.result.msg);
+                                        }
+                                    },
+                                    error: function(n) {
+                                        layer.msg("添加题目失败,"+n.responseJSON.result.msg);
+                                    }
+                                });
+                            },
+                            end: function (res) {
+                                multipleNum = 1;
+                                radioNum = 1;
+                                $("#radio_answer_area").css("display", 'inline');
+                                $("#multiple_answer_area").css("display", 'none');
+                                $("#judge_answer_area").css("display", 'none');
+                                $("#questionInfoFrame").css("display", 'none');
+                            }
+                        });
+                        break;
+                }
+                ;
+            });
+
+            function reload() {
+                tableIns.reload({
+                    where: {
+                        "msg":"",
+                        "code":"",
+                        "data": {
+                            "content": $('#search-content').val(),
+                            "startDate": $("#search-createTime").val().split(" - ")[0],
+                            "endTime": $("#search-createTime").val().split(" - ")[1]!=null?$("#search-createTime").val().split(" - ")[1]:"",
+                            "type": $('#search-type').val()
+                        }
+                    }
+                    , page: {
+                        curr: 1 //重新从第 1 页开始
+                    }
+                });
+            }
+
+            form.on('select(type)', function(data){
+                var type = data.value;
+                $("#radio_answer_area").css("display", 'none');
+                $("#multiple_answer_area").css("display", 'none');
+                $("#judge_answer_area").css("display", 'none');
+                if(type === "1"){
+                    $("#radio_answer_area").css("display", 'inline');
+                }else if(type === "2"){
+                    $("#multiple_answer_area").css("display", 'inline');
+                }else if(type === "3"){
+                    $("#judge_answer_area").css("display", 'inline');
+                }
+                form.render(null,"questionInfoForm");
+            });
+
+
+            // ----------------------------------多选题------------------------------------
+            var multipleNum = 1;
+            var multipleMaxCount = 7;
+            $("#addMultiple").click(function () {
+                if(multipleNum >= multipleMaxCount){
+                    layer.msg("最多添加7个选项！");
+                    return;
+                }else {
+                    multipleNum++;
+                }
+                var str = '<div name="multipleAddArea" class="layui-form-item" style="display: flex;align-items: center;">\n' +
+                    '                <label class="layui-form-label">选项&nbsp;</label>\n' +
+                    '                <div class="layui-input-inline" style="width: 490px">\n' +
+                    '                    <input name="multipleAnswer" type="text" autocomplete="off" class="layui-input">\n' +
+                    '                </div>\n' +
+                    '                <div class="layui-input-inline" style="margin-left: 10px;width: 100px">\n' +
+                    '                    <input type="checkbox" name="isCorrects" checked="" lay-text="正确|错误" lay-skin="switch">\n' +
+                    '                </div>\n' +
+                    '                <div class="layui-input-inline" style="margin-left: 30px;width: 50px">\n' +
+                    '                    <button type="button" class="layui-btn layui-btn-danger layui-btn-sm removeclass">\n' +
+                    '                        <i class="layui-icon layui-icon-subtraction"></i>\n' +
+                    '                    </button>\n' +
+                    '                </div>\n' +
+                    '            </div>';
+                $("#multiple_answer_area2").append(str);
+                layui.form.render();
+            });
+            // ----------------------------------单选题------------------------------------
+            var radioNum = 1;
+            var radioMaxCount = 7;
+            $("#addRadio").click(function () {
+                if(radioNum >= radioMaxCount){
+                    layer.msg("最多添加7个选项！");
+                    return;
+                }else {
+                    radioNum++;
+                }
+                var str = '<div name="radioAddArea" class="layui-form-item" style="display: flex;align-items: center;">\n' +
+                    '            <label class="layui-form-label">选项&nbsp;</label>\n' +
+                    '            <div class="layui-input-inline" style="width: 490px">\n' +
+                    '                <input name="radioAnswer" type="text" autocomplete="off" class="layui-input">\n' +
+                    '            </div>\n' +
+                    '            <div class="layui-input-inline" style="margin-left: 10px;width: 100px">\n' +
+                    '                <input type="radio" name="isCorrect" title="正确">\n' +
+                    '            </div>\n' +
+                    '            <div class="layui-input-inline" style="margin-left: 30px;width: 50px">\n' +
+                    '                <button type="button" class="layui-btn layui-btn-danger layui-btn-sm removeclass">\n' +
+                    '                    <i class="layui-icon layui-icon-subtraction"></i>\n' +
+                    '                </button>\n' +
+                    '            </div>\n' +
+                    '        </div>';
+                $("#radio_answer_area2").append(str);
+                layui.form.render();
+            });
+
+            //删除动态添加的input输入框
+            $("body").on('click', ".removeclass", function () {
+                //元素移除前校验是否被引用
+                var approvalName = $(this).parent().prev('div.layui-input-inline').children().val();
+                var parentEle = $(this).parent().parent();
+                parentEle.remove();
+                radioNum--;
+                layui.form.render();
+            });
+        });
+
+    </script>
+</head>
+<body>
+<div class="layui-layout layui-layout-admin">
+
+    <div th:replace="admin/end-common::header"></div>
+    <div th:replace="admin/end-common::side('question')"></div>
+
+    <div class="layui-body body">
+        <div class="layui-fluid" style="padding: 15px;">
+            <div class="layui-card">
+                <form class="layui-form layui-card-header" style="padding: 15px" lay-filter="searchQuestionInfoForm" id="searchQuestionInfoForm">
+                    <div class="layui-form-item">
+                        <div class="layui-inline" style="width:300px;">
+                            <input class="layui-input" id="search-content" autocomplete="off" placeholder="题目">
+                        </div>
+                        <div class="layui-inline" style="margin-right: 0;">
+                            <div class="layui-form-mid">角色</div>
+                            <div class="layui-input-inline">
+                                <select id="search-type">
+                                    <option value="1">单选题</option>
+                                    <option value="2">多选题</option>
+                                    <option value="3">判断题</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="layui-inline">
+                            <input type="text" id="search-createTime" placeholder="创建时间" autocomplete="off" class="layui-input">
+                        </div>
+                        <div class="layui-inline" style="float: right;">
+                            <button type="button" class="layui-btn" id="searchBtn">
+                                <i class="layui-icon layui-icon-search"></i> 搜索
+                            </button>
+                            <button  type="button" class="layui-btn" id="resetBtn">重置</button>
+                        </div>
+
+                    </div>
+                </form>
+
+                <div class="layui-card-body">
+                    <div style="padding-bottom:10px;">
+                        <table class="layui-hide" id="QuestionTable" lay-skin="line" lay-filter="QuestionTable">
+                        </table>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+    </div>
+
+    <div th:replace="admin/end-common::footer"></div>
+</div>
+
+</body>
+<div id="questionInfoFrame" style="display:none;">
+    <form class="layui-form" lay-filter="questionInfoForm" id="questionInfoForm" style="padding-right:30px">
+        <div class="layui-form-item" style="margin-top: 30px">
+            <label class="layui-form-label">题目</label>
+            <div class="layui-input-block">
+                <textarea id="content" placeholder="请输入题目" autocomplete="off" class="layui-textarea"></textarea>
+            </div>
+        </div>
+        <div class="layui-form-item" >
+            <label class="layui-form-label">选择题库</label>
+            <div class="layui-input-block" >
+                <div id="repoIds" class="xm-select-demo"></div>
+            </div>
+        </div>
+        <div class="layui-form-item">
+            <label class="layui-form-label">题目类型</label>
+            <div class="layui-input-block" >
+                <select id="type" lay-filter="type">
+                    <option value="1">单选题</option>
+                    <option value="2">多选题</option>
+                    <option value="3">判断题</option>
+                </select>
+            </div>
+        </div>
+        <fieldset class="layui-elem-field layui-field-title" style="margin-top: 30px;">
+            <legend>选项</legend>
+        </fieldset>
+        <div id="radio_answer_area" style="display:none;">
+            <div class="layui-form-item" style="display: flex;align-items: center;">
+                <label class="layui-form-label">选项&nbsp;</label>
+                <div class="layui-input-inline" style="width: 490px">
+                    <input id="firstRadioAnswer" name="radioAnswer" type="text" autocomplete="off" class="layui-input">
+                </div>
+                <div class="layui-input-inline" style="margin-left: 10px;width: 100px">
+                    <input id="firstRadioCorrection" type="radio" name="isCorrect" value="正确" title="正确">
+                </div>
+                <div class="layui-input-inline" style="margin-left: 30px;width: 50px">
+                    <button id="addRadio" type="button" class="layui-btn layui-btn-warm layui-btn-sm">
+                        <i class="layui-icon layui-icon-addition"></i>
+                    </button>
+                </div>
+            </div>
+            <div id="radio_answer_area2"></div>
+        </div>
+        <div id="multiple_answer_area" style="display:none;">
+            <div class="layui-form-item" style="display: flex;align-items: center;">
+                <label class="layui-form-label">选项&nbsp;</label>
+                <div class="layui-input-inline" style="width: 490px">
+                    <input id="firstMultipleAnswer" name="multipleAnswer" type="text" autocomplete="off" class="layui-input">
+                </div>
+                <div class="layui-input-inline" style="margin-left: 10px;width: 100px">
+                    <input id="firstMultipleCorrection" type="checkbox" name="isCorrects" checked="" lay-text="正确|错误" lay-skin="switch">
+                </div>
+                <div class="layui-input-inline" style="margin-left: 30px;width: 50px">
+                    <button id="addMultiple" type="button" class="layui-btn layui-btn-warm layui-btn-sm">
+                        <i class="layui-icon layui-icon-addition"></i>
+                    </button>
+                </div>
+            </div>
+            <div id="multiple_answer_area2"></div>
+        </div>
+        <div id="judge_answer_area" style="display:none;">
+            <div class="layui-form-item" style="display: flex;align-items: center;">
+                <label class="layui-form-label">选项&nbsp;</label>
+                <div class="layui-input-inline">
+                    <input type="checkbox" id="correct" checked="" lay-text="正确|错误" lay-skin="switch">
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+</html>
