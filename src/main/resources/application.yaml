@@ -19,7 +19,6 @@ kaptcha:
   width: 110
   content:
     length: 4
-    source: 123456789
     space: 3
   font:
     color: black
