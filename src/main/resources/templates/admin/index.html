@@ -2,13 +2,14 @@
 <html xmlns:th="http://www.thymeleaf.org"
       xmlns:shiro="http://www.pollix.at/thymeleaf/shiro">
 <head th:replace="admin/end-common::commonCss(~{::title},~{},~{::script},~{::style})">
-    <title>JAVA在线考试-后台管理</title>
+    <title>在线考试-后台管理</title>
     <script th:src="@{/echarts/echarts.min.js}"></script>
     <style type="text/css">
-        .body{
+        .body {
             background-color: #f8f8f8;
         }
-        .shortcut i{
+
+        .shortcut i {
             display: inline-block;
             width: 100%;
             height: 100px;
@@ -20,7 +21,8 @@
             color: #333;
 
         }
-        .shortcut cite{
+
+        .shortcut cite {
             position: relative;
             top: 5px;
             display: block;
@@ -30,13 +32,15 @@
             white-space: nowrap;
             font-size: 18px;
         }
-        .shortcut a{
+
+        .shortcut a {
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
         }
-        .data{
+
+        .data {
             max-width: 100%;
             height: 87px;
             border-radius: 2px;
@@ -71,46 +75,11 @@
                                             <cite>用户管理</cite>
                                         </a>
                                     </li>
-                                    <li class="layui-col-md3">
-                                        <a th:href="@{/admin/user/clazz}">
-                                            <i class="layui-icon layui-icon-user"></i>
-                                            <cite>班级管理</cite>
-                                        </a>
-                                    </li>
-                                    <li class="layui-col-md3">
-                                        <a th:href="@{/admin/user/apply}">
-                                            <i class="layui-icon layui-icon-survey"></i>
-                                            <cite>申请列表</cite>
-                                        </a>
-                                    </li>
+
                                     <li class="layui-col-md3">
                                         <a th:href="@{/logout}">
                                             <i class="layui-icon layui-icon-logout"></i>
                                             <cite>退出登录</cite>
-                                        </a>
-                                    </li>
-                                    <li class="layui-col-md3">
-                                        <a th:href="@{/admin/exam/exam}">
-                                            <i class="layui-icon layui-icon-form"></i>
-                                            <cite>考试管理</cite>
-                                        </a>
-                                    </li>
-                                    <li class="layui-col-md3">
-                                        <a th:href="@{/admin/question/question}">
-                                            <i class="layui-icon layui-icon-component"></i>
-                                            <cite>题目管理</cite>
-                                        </a>
-                                    </li>
-                                    <li class="layui-col-md3">
-                                        <a th:href="@{/admin/question/repo}">
-                                            <i class="layui-icon layui-icon-read"></i>
-                                            <cite>题库管理</cite>
-                                        </a>
-                                    </li>
-                                    <li class="layui-col-md3">
-                                        <a th:href="@{/admin/notice}">
-                                            <i class="layui-icon layui-icon-chart-screen"></i>
-                                            <cite>公告管理</cite>
                                         </a>
                                     </li>
                                 </ul>
@@ -152,7 +121,8 @@
                                     <li class="layui-col-md4">
                                         <div class="data">
                                             <span style="font-size: 20px;color:#009688">题目总数</span>
-                                            <span style="font-size: 40px;font-weight: 400" th:text="${question}">0</span>
+                                            <span style="font-size: 40px;font-weight: 400"
+                                                  th:text="${question}">0</span>
                                         </div>
                                     </li>
                                     <li class="layui-col-md4">
@@ -193,25 +163,25 @@
     var myQuestionChart;
     var myExamChart;
     var myUserChart;
-    layui.use('carousel', function(){
+    layui.use('carousel', function () {
 
         var carousel = layui.carousel;
         //建造实例
         carousel.render({
             elem: '#chart'
-            ,width: '100%'
-            ,height: '400px'
-            ,arrow: 'none'
-            ,autoplay: false
-            ,indicator: 'inside'
-            ,trigger : 'mouseover'
+            , width: '100%'
+            , height: '400px'
+            , arrow: 'none'
+            , autoplay: false
+            , indicator: 'inside'
+            , trigger: 'mouseover'
         });
 
         initQuestionChart();
         initExamChart();
         initUserChart();
 
-        carousel.on('change(chart)', function(obj){
+        carousel.on('change(chart)', function (obj) {
             console.log(obj.index); //当前条目的索引
             myQuestionChart.resize();
             myExamChart.resize();
@@ -219,12 +189,13 @@
         });
 
     });
+
     function initQuestionChart() {
         $.ajax({
             url: '/chart/adminQuestionChart',
             type: 'get',
             dataType: 'json',
-            success:function (data){
+            success: function (data) {
                 var questionChartDom = document.getElementById('questionChart');
                 myQuestionChart = echarts.init(questionChartDom);
                 var questionOption;
@@ -251,7 +222,7 @@
                         orient: 'vertical',
                         left: 'left',
                         data: data.data.repo.dataList
-                    },{
+                    }, {
                         orient: 'vertical',
                         left: 'right',
                         data: data.data.type.dataList
@@ -293,12 +264,13 @@
             }
         });
     }
+
     function initExamChart() {
         $.ajax({
             url: '/chart/adminExamChart',
             type: 'get',
             dataType: 'json',
-            success:function (data){
+            success: function (data) {
                 var examChart = document.getElementById('examChart');
                 myExamChart = echarts.init(examChart);
                 var examOption;
@@ -328,12 +300,13 @@
             }
         });
     }
+
     function initUserChart() {
         $.ajax({
             url: '/chart/adminUserChart',
             type: 'get',
             dataType: 'json',
-            success:function (data){
+            success: function (data) {
                 var examChart = document.getElementById('userChart');
                 myUserChart = echarts.init(examChart);
                 var userption;
